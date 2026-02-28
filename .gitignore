@@ -1,0 +1,9 @@
+target/
+*.class
+*.jar
+*.war
+.mvn/
+uploads/
+class2000-uploads/
+*.log
+.env
