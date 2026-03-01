@@ -1,0 +1,10 @@
+target/
+*.class
+*.jar
+*.war
+.git/
+.gitignore
+uploads/
+class2000-uploads/
+*.log
+.env
