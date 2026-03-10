@@ -1,5 +1,6 @@
 package com.class2000.reunion.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -27,6 +28,7 @@ public class Comment {
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @JsonIgnore                          // ← breaks the infinite loop
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
     private DiscussionPost post;
