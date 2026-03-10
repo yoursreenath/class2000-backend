@@ -25,7 +25,7 @@ public class DataSeeder {
             InitiativeRepository initiativeRepo
     ) {
         return args -> {
-
+		/*
             // Members
             memberRepo.save(Member.builder().firstName("Aarav").lastName("Sharma").currentCity("Bangalore").currentJob("Software Engineer").bio("Loving tech and coffee!").email("aarav@example.com").build());
             memberRepo.save(Member.builder().firstName("Priya").lastName("Nair").currentCity("Mumbai").currentJob("Doctor").bio("Passionate about healthcare.").email("priya@example.com").build());
@@ -111,6 +111,7 @@ public class DataSeeder {
                     .year("2024")
                     .build());
             }
+			*/
         };
     }
 }
