@@ -1,6 +1,9 @@
 package com.class2000.reunion.controller;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,24 +17,48 @@ import java.util.UUID;
 @RequestMapping("/api/upload")
 public class FileUploadController {
 
-    // Always use a fixed absolute path — no relative path ambiguity
+    // ── Cloudinary config (injected from env vars / application.properties) ──
+    @Value("${cloudinary.cloud-name:}")
+    private String cloudName;
+
+    @Value("${cloudinary.api-key:}")
+    private String apiKey;
+
+    @Value("${cloudinary.api-secret:}")
+    private String apiSecret;
+
+    private Cloudinary cloudinary;
+    private boolean useCloudinary = false;
+
+    // ── Local fallback (dev only) ──
     private static final Path UPLOAD_DIR = Paths.get(
         System.getProperty("user.home"), "class2000-uploads"
     ).toAbsolutePath().normalize();
 
     @PostConstruct
     public void init() {
-        try {
-            Files.createDirectories(UPLOAD_DIR);
-            System.out.println("==============================================");
-            System.out.println("Upload directory: " + UPLOAD_DIR);
-            System.out.println("Exists: " + Files.exists(UPLOAD_DIR));
-            System.out.println("==============================================");
-        } catch (IOException e) {
-            System.err.println("Failed to create upload directory: " + e.getMessage());
+        // Use Cloudinary if all three credentials are provided
+        if (!cloudName.isBlank() && !apiKey.isBlank() && !apiSecret.isBlank()) {
+            cloudinary = new Cloudinary(ObjectUtils.asMap(
+                "cloud_name", cloudName,
+                "api_key",    apiKey,
+                "api_secret", apiSecret,
+                "secure",     true
+            ));
+            useCloudinary = true;
+            System.out.println("=== File storage: Cloudinary (" + cloudName + ") ===");
+        } else {
+            // Local disk fallback for dev
+            try {
+                Files.createDirectories(UPLOAD_DIR);
+                System.out.println("=== File storage: Local disk → " + UPLOAD_DIR + " ===");
+            } catch (IOException e) {
+                System.err.println("Failed to create upload dir: " + e.getMessage());
+            }
         }
     }
 
+    // ── Upload endpoint ───────────────────────────────────────────────────────
     @PostMapping("/photo")
     public ResponseEntity<?> uploadPhoto(@RequestParam("file") MultipartFile file) {
         String contentType = file.getContentType();
@@ -41,60 +68,68 @@ public class FileUploadController {
         }
 
         try {
-            String originalFilename = file.getOriginalFilename();
-            String extension = "";
-            if (originalFilename != null && originalFilename.contains(".")) {
-                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            if (useCloudinary) {
+                return uploadToCloudinary(file);
+            } else {
+                return uploadToLocalDisk(file);
             }
-            String uniqueFilename = UUID.randomUUID().toString() + extension;
-            Path filePath = UPLOAD_DIR.resolve(uniqueFilename);
-
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-            System.out.println("Saved: " + filePath + " (" + Files.size(filePath) + " bytes)");
-
-            return ResponseEntity.ok(Map.of(
-                "url", "/api/upload/files/" + uniqueFilename,
-                "filename", uniqueFilename
-            ));
         } catch (IOException e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Failed to store file: " + e.getMessage()));
+                .body(Map.of("error", "Upload failed: " + e.getMessage()));
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private ResponseEntity<?> uploadToCloudinary(MultipartFile file) throws IOException {
+        Map<String, Object> result = cloudinary.uploader().upload(
+            file.getBytes(),
+            ObjectUtils.asMap(
+                "folder",          "class2000",
+                "resource_type",   "image",
+                "use_filename",    false,
+                "unique_filename", true
+            )
+        );
+        String secureUrl = (String) result.get("secure_url");
+        System.out.println("Cloudinary upload OK: " + secureUrl);
+        return ResponseEntity.ok(Map.of("url", secureUrl));
+    }
+
+    private ResponseEntity<?> uploadToLocalDisk(MultipartFile file) throws IOException {
+        String original  = file.getOriginalFilename();
+        String extension = (original != null && original.contains("."))
+            ? original.substring(original.lastIndexOf("."))
+            : "";
+        String filename = UUID.randomUUID() + extension;
+        Path   filePath = UPLOAD_DIR.resolve(filename);
+        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        System.out.println("Local upload OK: " + filePath);
+        return ResponseEntity.ok(Map.of(
+            "url",      "/api/upload/files/" + filename,
+            "filename", filename
+        ));
+    }
+
+    // ── Serve local files (dev only — not used when Cloudinary is active) ────
     @GetMapping("/files/{filename}")
     public ResponseEntity<byte[]> serveFile(@PathVariable String filename) {
         try {
-            // Resolve against the same fixed absolute UPLOAD_DIR
             Path filePath = UPLOAD_DIR.resolve(filename).normalize();
-
-            System.out.println("Serve request  : " + filename);
-            System.out.println("Resolved path  : " + filePath);
-            System.out.println("Starts with dir: " + filePath.startsWith(UPLOAD_DIR));
-            System.out.println("File exists    : " + Files.exists(filePath));
-
-            // Security: reject path traversal attempts
             if (!filePath.startsWith(UPLOAD_DIR)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
-
             if (!Files.exists(filePath)) {
                 return ResponseEntity.notFound().build();
             }
-
             byte[] bytes = Files.readAllBytes(filePath);
-            String type = Files.probeContentType(filePath);
+            String type  = Files.probeContentType(filePath);
             if (type == null) type = "application/octet-stream";
-
             return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(type))
                 .header(HttpHeaders.CACHE_CONTROL, "no-cache")
                 .body(bytes);
-
         } catch (IOException e) {
-            e.printStackTrace();
             return ResponseEntity.notFound().build();
         }
     }
