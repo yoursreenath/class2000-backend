@@ -20,6 +20,7 @@ public class GetTogether {
     @NotBlank
     private String title;           // e.g. "1st Get-Together"
 
+	@Column(columnDefinition = "TEXT")
     private String description;     // short description shown on card
 
     private String location;        // e.g. "Bangalore"
