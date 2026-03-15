@@ -16,9 +16,16 @@ public class PhotoController {
 
     private final PhotoRepository photoRepository;
 
+    // All photos (general gallery — no get-together)
     @GetMapping
     public List<Photo> getAll() {
-        return photoRepository.findAll();
+        return photoRepository.findByGetTogetherIdIsNullOrderByUploadedAtDesc();
+    }
+
+    // Photos for a specific get-together
+    @GetMapping("/get-together/{getTogetherId}")
+    public List<Photo> getByGetTogether(@PathVariable Long getTogetherId) {
+        return photoRepository.findByGetTogetherIdOrderByUploadedAtAsc(getTogetherId);
     }
 
     @GetMapping("/{id}")

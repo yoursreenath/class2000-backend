@@ -30,5 +30,8 @@ public class Photo {
     @Builder.Default
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
-    private String tags; // comma-separated
+    private String tags;
+
+    // null = general gallery, set = belongs to a get-together album
+    private Long getTogetherId;
 }
