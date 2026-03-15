@@ -18,7 +18,7 @@ public class MemberController {
 
     @GetMapping
     public List<Member> getAll() {
-        return memberRepository.findAll();
+        return memberRepository.findAllByOrderByFirstNameAsc();
     }
 
     @GetMapping("/{id}")
@@ -30,7 +30,7 @@ public class MemberController {
 
     @GetMapping("/search")
     public List<Member> search(@RequestParam String q) {
-        return memberRepository.findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(q, q);
+        return memberRepository.findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCaseOrderByFirstNameAsc(q, q);
     }
 
     @PostMapping

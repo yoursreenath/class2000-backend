@@ -18,7 +18,7 @@ public class TeacherController {
 
     @GetMapping
     public List<Teacher> getAll() {
-        return teacherRepository.findAll();
+        return teacherRepository.findAllByOrderByFirstNameAsc();
     }
 
     @GetMapping("/{id}")
@@ -31,7 +31,7 @@ public class TeacherController {
     @GetMapping("/search")
     public List<Teacher> search(@RequestParam String q) {
         return teacherRepository
-                .findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(q, q);
+                .findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCaseOrderByFirstNameAsc(q, q);
     }
 
     @PostMapping
